@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<meta name="description" content="memory test">
+
+	<title>Are You Smarter than a Chimp?</title>
+	<style type="text/css">
+		/* * { border: 0; margin: 0; padding: 0; } */
+		body, html, div { border: 0; margin: 0; padding: 0; }
+		body, html {  height: 100%; }
+		#dc { position:absolute; width: 100%; height: 100%; z-index:10; }
+		#menu, #menu-open-wrap {
+			position:fixed;
+			width: 96%;
+			padding: 2%;
+			margin: 0;
+			z-index: 11;
+			color: #999999;
+			text-shadow: 0px 0px 5px #222;
+			font-family: arial;
+			font-size: 1.5rem;
+		}
+		#menu {
+			background-color: rgba(0,0,0,0.8);
+			display: none;
+		}
+		#menu p {
+			padding-bottom: 1rem;
+		}
+		button {
+			font-size: 1rem;
+			cursor: pointer;
+			z-index: 12;
+		}
+		#menu-close, #menu-open {
+			color: #aaa;
+			float: right;
+			font-size: 1.75rem;
+			font-weight: 700;
+			margin-top: -.7rem;
+			cursor: pointer;
+			z-index: 12;
+		}
+		#stats {
+			height: 30rem;
+			overflow-y: scroll;
+			font-size:1.0rem;
+		}
+	</style>
+  </head>
+  <body>
+	<canvas id="dc"></canvas>
+	<div id="menu-open-wrap">
+		<span id="menu-open">𑁔</span>
+	</div>
+	<div id="menu">
+		<span id="menu-close">×</span>
+			<p>
+				<span>Clear numbers and try again:&nbsp;</span><button id="reset">Restart</button>
+			</p>
+			<p>
+				Use numbers in range: 1 through <input id="rangeHi" type="number" min="2" max="100" inputmode="numeric" pattern="\d*"/>
+			</p>
+			<pre id="stats"></pre>
+	</div>
+	<script type="text/javascript">
+
+const rangeLo = 1;
+var rangeHi = 10;
+document.querySelector('#rangeHi').value = rangeHi;
+
+const initialPauseBeforeStartMs = 3000;
+
+const dCanvas = document.getElementById('dc');
+const dContext = dCanvas.getContext('2d');
+
+const gridSpacing = 10;
+var gridPadLeft = 0;
+var gridPadTop = 0;
+var gridSquareSize = 0;
+var gridWidthInSquares = 0;
+var gridHeightInSquares = 0;
+const requiredMinPad = 60;
+
+// used to cancel a setTimeout delay
+var delayTimeout = null;
+
+var gridPositionsUsed = {};
+var nextNumberToTap = 1;
+var startTimeMs = 0;
+
+var menuIsOpen = false;
+
+function closeMenu() {
+	document.getElementById('menu').style.display = 'none';
+	document.getElementById('menu-open-wrap').style.display = 'block';
+	menuIsOpen = false;
+}
+
+function openMenu() {
+	window.clearTimeout(delayTimeout);
+	document.getElementById('menu').style.display = 'block';
+	document.getElementById('menu-open-wrap').style.display = 'none';
+	menuIsOpen = true;
+}
+
+function fillBlack(ctx) {
+	const canvas = ctx.canvas;
+	ctx.fillStyle = "#000000";
+	ctx.fillRect(0,0,canvas.width, canvas.height);
+}
+
+function fillCenterText(ctx, text) {
+	const canvas = ctx.canvas;
+	var textSize = Math.min(canvas.width, canvas.height) / 12;
+	if (textSize < 8) {
+		textSize = 8;
+	}
+	ctx.font = textSize + 'px Arial';
+	ctx.fillStyle = "#444444";
+	ctx.textAlign = 'center';
+	ctx.fillText(text, canvas.width/2, canvas.height/2);
+}
+
+function fillCenterSubtext(ctx, text) {
+	const canvas = ctx.canvas;
+	var textSize = Math.min(canvas.width, canvas.height) / 25;
+	if (textSize < 5) {
+		textSize = 5;
+	}
+	ctx.font = textSize + 'px Arial';
+	ctx.fillStyle = "#444444";
+	ctx.textAlign = 'center';
+	ctx.fillText(text, canvas.width/2, canvas.height*12/20);
+}
+
+function setAndDrawNumber(ctx, number) {
+	const canvas = ctx.canvas;
+	let textSize = Math.floor(gridSquareSize * 0.6);
+	if (textSize < 5) {
+		textSize = 5;
+	}
+	ctx.font = textSize + 'px Arial';
+	ctx.fillStyle = "#FFF";
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+
+	// random grid square
+	let dX, dY, posName;
+	do {
+		dX = Math.floor(Math.random() * gridWidthInSquares);
+		dY = Math.floor(Math.random() * gridHeightInSquares);
+		posName = dX + "," + dY;
+	} while (posName in gridPositionsUsed);
+
+	const squareX = (dX * (gridSquareSize + gridSpacing)) + gridPadLeft;
+	const squareY = (dY * (gridSquareSize + gridSpacing)) + gridPadTop;
+	gridPositionsUsed[posName] = {n:number, xMin: squareX, xMax: squareX + gridSquareSize, yMin: squareY, yMax: squareY + gridSquareSize};
+
+	//ctx.strokeStyle = "#FFF";
+	//ctx.strokeWidth = 2;
+	//ctx.strokeRect(squareX, squareY, gridSquareSize, gridSquareSize);
+
+	const centerX = squareX + (gridSquareSize / 2);
+	const centerY = squareY + (gridSquareSize / 2);
+	ctx.fillText("" + number, centerX, centerY);
+}
+
+function drawAllRemainingNumbers(ctx) {
+	fillBlack(ctx);
+	const canvas = ctx.canvas;
+	let textSize = Math.floor(gridSquareSize * 0.6);
+	if (textSize < 3) {
+		textSize = 3;
+	}
+	ctx.font = textSize + 'px Arial';
+	ctx.fillStyle = "#FFF";
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+
+	let numObj;
+	for (k in gridPositionsUsed) {
+		numObj = gridPositionsUsed[k];
+		if (numObj.n < nextNumberToTap) {
+			continue;
+		}
+		const centerX = numObj.xMin + (gridSquareSize / 2);
+		const centerY = numObj.yMin + (gridSquareSize / 2);
+		ctx.fillStyle = "#FFF";
+		//ctx.strokeRect(numObj.xMin, numObj.yMin, gridSquareSize, gridSquareSize);
+		ctx.fillRect(numObj.xMin, numObj.yMin, gridSquareSize, gridSquareSize);
+		//ctx.fillStyle = "#CCC";
+		//ctx.fillText("" + numObj.n, centerX, centerY);
+	}
+}
+
+function setDScaleVars(forceReset, dCtx) {
+	var canvas = dCtx.canvas;
+	if (forceReset || canvas.width != canvas.offsetWidth || canvas.height != canvas.offsetHeight) {
+		// example in video was a grid 8 wide by 6 high, so we'll target
+		//   5 times the largest number
+		const targetTotalSquares = Math.max(25, rangeHi * 5);
+		canvas.width = canvas.offsetWidth;
+		canvas.height = canvas.offsetHeight;
+		const smallDim = Math.min(canvas.width, canvas.height) - (requiredMinPad * 2);
+		const largeDim = Math.max(canvas.width, canvas.height) - (requiredMinPad * 2);
+		var afterFiftyMet = 0;
+		var totalSquares = 0;
+		var closestToFifty = 0;
+		var squareSize;
+		var bestSquareSize = 0;
+		var smallDimSquares = 0;
+		while (afterFiftyMet <= 1) {
+			smallDimSquares++;
+			//console.log("trying " + smallDimSquares + " squares across the smaller dimension...");
+			squareSize = (smallDim - gridSpacing) / smallDimSquares;
+			squareSize = Math.floor(squareSize - gridSpacing);
+			totalSquares = Math.floor((smallDim - gridSpacing)/(squareSize + gridSpacing)) * Math.floor((largeDim - gridSpacing)/(squareSize + gridSpacing));
+			if (totalSquares >= targetTotalSquares) {
+				console.log({closest:closestToFifty, closestSize:bestSquareSize, current:totalSquares, currentSize:squareSize});
+				afterFiftyMet++;
+			}
+			if (Math.abs(targetTotalSquares - totalSquares) < Math.abs(targetTotalSquares - closestToFifty)) {
+				bestSquareSize = squareSize;
+				closestToFifty = totalSquares;
+			}
+		}
+		gridSquareSize = bestSquareSize;
+		gridWidthInSquares = Math.floor((canvas.width - requiredMinPad - requiredMinPad)/(gridSquareSize + gridSpacing));
+		gridPadLeft = canvas.width - (gridWidthInSquares * gridSquareSize) - ((gridWidthInSquares-1) * gridSpacing)
+		gridPadLeft /= 2;
+		gridHeightInSquares = Math.floor((canvas.height - requiredMinPad - requiredMinPad)/(gridSquareSize + gridSpacing));
+		gridPadTop = canvas.height - (gridHeightInSquares * gridSquareSize) - ((gridHeightInSquares-1) * gridSpacing)
+		gridPadTop /= 2;
+		console.log("final: ");
+		console.log({closest:closestToFifty, closestSize:bestSquareSize, width:gridWidthInSquares, height:gridHeightInSquares, padLeft:gridPadLeft, padTop:gridPadTop});
+	}
+}
+
+function resetIntroText() {
+	window.clearTimeout(delayTimeout);
+	nextNumberToTap = -1;
+	setDScaleVars(true, dContext);
+	fillBlack(dContext);
+	fillCenterText(dContext, 'Touch the numbers in order.');
+	fillCenterSubtext(dContext, 'Touch number 1 to begin.');
+}
+
+function setSuccessText() {
+	window.clearTimeout(delayTimeout);
+	nextNumberToTap = -1;
+	setDScaleVars(true, dContext);
+	fillBlack(dContext);
+	fillCenterText(dContext, 'Great!');
+}
+
+function startAfterDelay() {
+	resetIntroText();
+	delayTimeout = window.setTimeout(start, initialPauseBeforeStartMs);
+}
+
+function start() {
+	window.clearTimeout(delayTimeout);
+	closeMenu();
+	gridPositionsUsed = {};
+	nextNumberToTap = 1;
+	startTimeMs = Date.now();
+	fillBlack(dContext);
+	for (var i = rangeLo; i <= rangeHi; i++) {
+		setAndDrawNumber(dContext, i);
+	}
+}
+
+// from https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API/Using_the_Web_Storage_API
+function storageAvailable(type) {
+	let storage;
+	try {
+		storage = window[type];
+		const x = '__storage_test__';
+		storage.setItem(x, x);
+		storage.removeItem(x);
+		return true;
+	}
+	catch (e) {
+		return e instanceof DOMException && (
+			// everything except Firefox
+			e.code === 22 ||
+			// Firefox
+			e.code === 1014 ||
+			// test name field too, because code might not be present
+			// everything except Firefox
+			e.name === 'QuotaExceededError' ||
+			// Firefox
+			e.name === 'NS_ERROR_DOM_QUOTA_REACHED') &&
+			// acknowledge QuotaExceededError only if there's something already stored
+			(storage && storage.length !== 0);
+	}
+}
+
+
+function saveResult(wasSuccess, totalCorrect, startMs) {
+	if (!storageAvailable('localStorage')) {
+		console.log("no localStorage available");
+		return;
+	}
+	const gameName = rangeLo + '-' + rangeHi;
+	let gameNames = JSON.parse(localStorage.getItem('games'));
+	if (gameNames == null) {
+		gameNames = [gameName];
+	} else if (gameNames.indexOf(gameName) == -1) {
+		gameNames.push(gameName);
+	}
+	localStorage.setItem('games', JSON.stringify(gameNames));
+
+	let results = JSON.parse(localStorage.getItem(gameName));
+	if (results == null) {
+		results = {overall: {}, byDate: {}};
+	}
+	//const todayDate = new Date().toDateString();
+	const todayDate = new Date().toISOString().substring(0, 10);
+	const elapsedMs = Date.now() - startMs;
+	if (!results.byDate.hasOwnProperty(todayDate)) {
+		results.byDate[todayDate] = [];
+	}
+	results.byDate[todayDate].push({correct: totalCorrect, ms: elapsedMs});
+	localStorage.setItem(gameName, JSON.stringify(results));
+
+	// update the results listing
+	showResults();
+}
+
+function showResults() {
+	if (!storageAvailable('localStorage')) {
+		console.log("no localStorage available");
+		return;
+	}
+	let gameNames = JSON.parse(localStorage.getItem('games'));
+	if (gameNames == null) {
+		return;
+	}
+	const statsPre = document.querySelector('#stats');
+	statsPre.innerHTML = '';
+	for (let i = 0; i < gameNames.length; i++) {
+		let results = JSON.parse(localStorage.getItem(gameNames[i]));
+		if (results == null) {
+			continue;
+		}
+		const gameHi = parseInt(gameNames[i].split('-')[1]);
+		const gameHiF = parseFloat(gameHi);
+		const dates = [];
+		for (date in results.byDate) {
+			dates.push(date);
+		}
+		dates.sort();
+		//const todayDate = new Date().toISOString().substring(0, 10);
+		//dates.splice(0, 0, todayDate);
+		let allGames = 0;
+		let allWins = 0;
+		let allSeconds = 0;
+		let allFastest = -1;
+		let allFastestDate = '';
+		let dayCorrect = 0;
+		let allCorrect = 0;
+		//let allCorrectPct = 0;
+		const contentLines = []
+
+		//contentLines.push('\n' + gameNames[i] + ':');
+		for (let j = 0; j < dates.length; j++) {
+			const date = dates[j];
+			let dayGames = results.byDate[date].length;
+			allGames += dayGames;
+			let dayWins = 0;
+			let daySeconds = 0;
+			let gameSeconds;
+			let fastestGame = -1;
+			for (let k = 0; k < dayGames; k++) {
+				gameSeconds = results.byDate[date][k].ms / 1000.0;
+				daySeconds += gameSeconds;
+				allSeconds += gameSeconds;
+				let correct = results.byDate[date][k].correct;
+				if (correct == gameHi) {
+					dayWins++;
+					allWins++;
+					if (fastestGame == -1 || gameSeconds < fastestGame) {
+						fastestGame = gameSeconds;
+					}
+					if (allFastest == -1 || gameSeconds < allFastest) {
+						allFastest = gameSeconds;
+						allFastestDate = date;
+					}
+				}
+				dayCorrect += correct;
+				allCorrect += correct;
+				//allCorrectPct += (parseFloat(correct) / gameHiF);
+			}
+			contentLines.push('');
+			contentLines.push(gameNames[i] + ' games on ' + date + ':');
+			contentLines.push('         games: ' + dayGames + '');
+			contentLines.push('          wins: ' + dayWins + " (" + Math.round(dayWins * 100.0 / dayGames) + '%)');
+			contentLines.push('avg. # correct: ' + (Math.round((dayCorrect * 100) / dayGames) / 100.0));
+			if (dayWins > 0) {
+				contentLines.push(' seconds / win: ' + (Math.round(daySeconds * 100.0 / dayGames) / 100.0) + 's');
+				contentLines.push('   fastest win: ' + (Math.round(fastestGame * 100.0) / 100.0) + 's');
+			} else {
+				contentLines.push(' seconds / win: --');
+				contentLines.push('   fastest win: --');
+			}
+		}
+		const overallLines = []
+		overallLines.push('');
+		overallLines.push('overall for ' + gameNames[i] + ':');
+		overallLines.push('         games: ' + allGames + '');
+		overallLines.push('          wins: ' + allWins + " (" + Math.round(allWins * 100.0 / allGames) + '%)');
+		//overallLines.push('avg. % correct: ' + (Math.round((allCorrectPct * 10000) / allGames) / 100.0));
+		overallLines.push('avg. # correct: ' + (Math.round((allCorrect * 100) / allGames) / 100.0));
+		if (allWins > 0) {
+			overallLines.push(' seconds / win: ' + (Math.round(allSeconds * 100.0 / allGames) / 100.0) + 's');
+			overallLines.push('   fastest win: ' + (Math.round(allFastest * 100.0) / 100.0) + 's (on ' + allFastestDate + ')');
+		} else {
+			overallLines.push(' seconds / win: --');
+			overallLines.push('   fastest win: --');
+		}
+		statsPre.innerHTML += overallLines.join('\n') + '\n' + contentLines.join('\n') + '\n\n=========================================';
+	}
+}
+
+document.getElementById('reset').addEventListener("click", function(e) {
+	start();
+}, true);
+
+dCanvas.addEventListener("click", function(e) {
+	if (menuIsOpen) {
+		return;
+	}
+	// dismiss the intro text and start immediately
+	if (nextNumberToTap == -1) {
+		window.clearTimeout(delayTimeout);
+		start();
+		return;
+	} else if (nextNumberToTap > rangeHi) {
+		return;
+	}
+	// see which number was tapped, if any
+	const x = e.pageX;
+	const y = e.pageY;
+	let numberTapped = -1;
+	for (k in gridPositionsUsed) {
+		numObj = gridPositionsUsed[k];
+		if (	numObj.xMin > x || numObj.xMax < x ||
+				numObj.yMin > y || numObj.yMax < y ||
+				numObj.n < nextNumberToTap) {
+			continue;
+		}
+		numberTapped = numObj.n;
+		break;
+	}
+	// do nothing if no number tapped
+	if (numberTapped == -1) {
+		return;
+	}
+	// do nothing if 1 has not been tapped yet
+	if (numberTapped > 1 && nextNumberToTap == 1) {
+		return;
+	}
+	// if the correct number was tapped...
+	if (numberTapped == nextNumberToTap) {
+		nextNumberToTap++;
+		if (nextNumberToTap <= rangeHi) {
+			drawAllRemainingNumbers(dContext);
+		} else {
+			saveResult(true, rangeHi, startTimeMs);
+			setSuccessText();
+		}
+	// if the wrong number was tapped
+	} else {
+		saveResult(false, nextNumberToTap - 1, startTimeMs);
+		nextNumberToTap = -1;
+		fillBlack(dContext);
+	}
+}, true);
+
+document.getElementById('menu-open').addEventListener("click", function(e) {
+	openMenu();
+}, true);
+
+document.getElementById('menu-close').addEventListener("click", function(e) {
+	closeMenu();
+}, true);
+
+document.querySelector('#rangeHi').addEventListener("change", function(e) {
+	const newMax = parseInt(e.target.value);
+	if (isNaN(newMax)) {
+		return;
+	}
+	rangeHi = Math.min(Math.max(newMax, 2), 100);
+	setDScaleVars(true, dContext);
+});
+
+showResults();
+startAfterDelay();
+
+	</script>
+  </body>
+</html>

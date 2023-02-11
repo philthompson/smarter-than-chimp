@@ -71,6 +71,9 @@ const rangeLo = 1;
 var rangeHi = 9;
 document.querySelector('#rangeHi').value = rangeHi;
 
+// thanks to https://stackoverflow.com/a/17762789/259456
+const buzzerAudio = new Audio('data:audio/mp3;base64,' + '/+NIxAAAAAAAAAAAAEluZm8AAAAPAAAACgAADGAAGRkZGRkZGRkZMzMzMzMzMzMzM0xMTExMTExMTExmZmZmZmZmZmZmgICAgICAgICAgJmZmZmZmZmZmZmzs7Ozs7Ozs7OzzMzMzMzMzMzMzObm5ubm5ubm5ub/////////////AAAAO0xBTUUzLjk5cgEoAAAAAAAAAAAUICQDwSIAACAAAAxgMicwy' + 'A'.repeat(159) + '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' + 'q'.repeat(44) + '/+NIxAAAAANIAcAAAExBTUUzLjk5LjWqqqqqqqqqqqqqTEFNRTMuOTkuNa' + 'q'.repeat(326));
+
 const initialPauseBeforeStartMs = 3000;
 
 const dCanvas = document.getElementById('dc');
@@ -250,10 +253,18 @@ function resetIntroText() {
 
 function setSuccessText() {
 	window.clearTimeout(delayTimeout);
-	nextNumberToTap = -1;
 	setDScaleVars(true, dContext);
 	fillBlack(dContext);
 	fillCenterText(dContext, 'Great!');
+	fillCenterSubtext(dContext, 'Tap anywhere to restart.');
+}
+
+function setFailText() {
+	window.clearTimeout(delayTimeout);
+	setDScaleVars(true, dContext);
+	fillBlack(dContext);
+	fillCenterText(dContext, 'Sorry!');
+	fillCenterSubtext(dContext, 'Tap anywhere to restart.');
 }
 
 function startAfterDelay() {
@@ -358,7 +369,7 @@ function showResults() {
 		//dates.splice(0, 0, todayDate);
 		let allGames = 0;
 		let allWins = 0;
-		let allSeconds = 0;
+		let allWinSeconds = 0;
 		let allFastest = -1;
 		let allFastestDate = '';
 		let dayCorrect = 0;
@@ -372,17 +383,17 @@ function showResults() {
 			let dayGames = results.byDate[date].length;
 			allGames += dayGames;
 			let dayWins = 0;
-			let daySeconds = 0;
+			let dayWinSeconds = 0;
 			let gameSeconds;
 			let fastestGame = -1;
 			for (let k = 0; k < dayGames; k++) {
 				gameSeconds = results.byDate[date][k].ms / 1000.0;
-				daySeconds += gameSeconds;
-				allSeconds += gameSeconds;
 				let correct = results.byDate[date][k].correct;
 				if (correct == gameHi) {
 					dayWins++;
+					dayWinSeconds += gameSeconds;
 					allWins++;
+					allWinSeconds += gameSeconds;
 					if (fastestGame == -1 || gameSeconds < fastestGame) {
 						fastestGame = gameSeconds;
 					}
@@ -401,7 +412,7 @@ function showResults() {
 			contentLines.push('          wins: ' + dayWins + " (" + Math.round(dayWins * 100.0 / dayGames) + '%)');
 			contentLines.push('avg. # correct: ' + (Math.round((dayCorrect * 100) / dayGames) / 100.0));
 			if (dayWins > 0) {
-				contentLines.push(' seconds / win: ' + (Math.round(daySeconds * 100.0 / dayGames) / 100.0) + 's');
+				contentLines.push(' seconds / win: ' + (Math.round(dayWinSeconds * 100.0 / dayWins) / 100.0) + 's');
 				contentLines.push('   fastest win: ' + (Math.round(fastestGame * 100.0) / 100.0) + 's');
 			} else {
 				contentLines.push(' seconds / win: --');
@@ -416,7 +427,7 @@ function showResults() {
 		//overallLines.push('avg. % correct: ' + (Math.round((allCorrectPct * 10000) / allGames) / 100.0));
 		overallLines.push('avg. # correct: ' + (Math.round((allCorrect * 100) / allGames) / 100.0));
 		if (allWins > 0) {
-			overallLines.push(' seconds / win: ' + (Math.round(allSeconds * 100.0 / allGames) / 100.0) + 's');
+			overallLines.push(' seconds / win: ' + (Math.round(allWinSeconds * 100.0 / allWins) / 100.0) + 's');
 			overallLines.push('   fastest win: ' + (Math.round(allFastest * 100.0) / 100.0) + 's (on ' + allFastestDate + ')');
 		} else {
 			overallLines.push(' seconds / win: --');
@@ -471,13 +482,15 @@ dCanvas.addEventListener("click", function(e) {
 			drawAllRemainingNumbers(dContext);
 		} else {
 			saveResult(true, rangeHi, startTimeMs);
+			nextNumberToTap = -1;
 			setSuccessText();
 		}
 	// if the wrong number was tapped
 	} else {
 		saveResult(false, nextNumberToTap - 1, startTimeMs);
 		nextNumberToTap = -1;
-		fillBlack(dContext);
+		setFailText();
+		buzzerAudio.play();
 	}
 }, true);
 
